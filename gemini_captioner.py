@@ -3,9 +3,15 @@ import time
 import csv
 from datetime import datetime
 import google.generativeai as genai  # Use this alias for your Gemini API functions
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
+
+# Access the environment variab
+api_key = os.getenv("API_KEY")
 # Configure the API key
-genai.configure(api_key="AIzaSyAHGeqNvf9fYM8tHsLiQgvIWq0pM_ToZa4")  # Replace with your actual API key
+genai.configure(api_key=api_key)  # Replace with your actual API key
 
 # Constants
 RATE_LIMIT = 120  # 120 requests per minute

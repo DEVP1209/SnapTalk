@@ -134,7 +134,7 @@ if __name__ == "__main__":
     )
 
     loader, dataset = get_loader(
-        "flickr8k/images/", "flickr8k/captions.txt", transform=transform
+        "flickr30k_images/flickr30k_images/", "flickr30k_images/results.csv", transform=transform
     )
 
     for idx, (imgs, captions) in enumerate(loader):
