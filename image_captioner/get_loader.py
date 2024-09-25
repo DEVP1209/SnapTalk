@@ -16,7 +16,7 @@ from PIL import Image  # Load img
 # Note that loading the image is very easy compared to the text!
 
 # Download with: python -m spacy download en
-spacy_eng = spacy.load("en")
+spacy_eng = spacy.load("en_core_web_sm")
 
 
 class Vocabulary:
@@ -61,12 +61,18 @@ class Vocabulary:
 class FlickrDataset(Dataset):
     def __init__(self, root_dir, captions_file, transform=None, freq_threshold=5):
         self.root_dir = root_dir
-        self.df = pd.read_csv(captions_file)
+        try:
+            # Add this in the _init_ method of FlickrDataset
+            self.df = pd.read_csv(captions_file, delimiter='|')
+            self.df.dropna(subset=[' comment'], inplace=True)  # Adjust 'comment' based on your column name
+        except pd.errors.ParserError as e:
+            print(f"Error reading CSV: {e}")
         self.transform = transform
+        self.df[' comment'] = self.df[' comment'].astype(str)
 
         # Get img, caption columns
-        self.imgs = self.df["image"]
-        self.captions = self.df["caption"]
+        self.imgs = self.df["image_name"].values
+        self.captions = self.df[" comment"].values
 
         # Initialize vocabulary and build vocab
         self.vocab = Vocabulary(freq_threshold)

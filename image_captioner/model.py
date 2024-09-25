@@ -8,15 +8,16 @@ class EncoderCNN(nn.Module):
     def __init__(self, embed_size, train_CNN=False):
         super(EncoderCNN, self).__init__()
         self.train_CNN = train_CNN
-        self.inception = models.inception_v3(pretrained=True, aux_logits=False)
+        self.inception = models.inception_v3(pretrained=True, aux_logits=True)
         self.inception.fc = nn.Linear(self.inception.fc.in_features, embed_size)
         self.relu = nn.ReLU()
         self.times = []
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, images):
-        features = self.inception(images)
-        return self.dropout(self.relu(features))
+        features = self.inception(images)  # This returns InceptionOutputs
+        features = features[0]  # Extract the feature tensor, ignore auxiliary outputs
+        return features
 
 
 class DecoderRNN(nn.Module):

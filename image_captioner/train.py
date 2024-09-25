@@ -7,7 +7,7 @@ from torch.utils.tensorboard import SummaryWriter
 from utils import save_checkpoint, load_checkpoint, print_examples
 from get_loader import get_loader
 from model import CNNtoRNN
-
+import h5py
 
 def train():
     transform = transforms.Compose(
@@ -20,8 +20,8 @@ def train():
     )
 
     train_loader, dataset = get_loader(
-        root_folder="flickr8k/images",
-        annotation_file="flickr8k/captions.txt",
+        root_folder="./flickr30k_images/flickr30k_images/",
+        annotation_file="./flickr30k_images/results.csv",
         transform=transform,
         num_workers=2,
     )
@@ -90,7 +90,16 @@ def train():
             optimizer.zero_grad()
             loss.backward(loss)
             optimizer.step()
+            model_file = 'model.h5'
+
+    # Save model state_dict to .h5 file
+    with h5py.File(model_file, 'w') as h5f:
+        for key, value in model.state_dict().items():
+            h5f.create_dataset(key, data=value.cpu().numpy())
 
 
 if __name__ == "__main__":
     train()
+    
+    # At the end of your training process, add the following code to save the model:
+    
