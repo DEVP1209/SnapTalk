@@ -1,66 +1,96 @@
 import torch
+from tqdm import tqdm
 import torch.nn as nn
-import statistics
-import torchvision.models as models
+import torch.optim as optim
+import torchvision.transforms as transforms
+from torch.utils.tensorboard import SummaryWriter
+from utils import save_checkpoint, load_checkpoint, print_examples
+from get_loader import get_loader
+from model import CNNtoRNN
 
 
-class EncoderCNN(nn.Module):
-    def __init__(self, embed_size, train_CNN=False):
-        super(EncoderCNN, self).__init__()
-        self.train_CNN = train_CNN
-        self.inception = models.inception_v3(pretrained=True, aux_logits=False)
-        self.inception.fc = nn.Linear(self.inception.fc.in_features, embed_size)
-        self.relu = nn.ReLU()
-        self.times = []
-        self.dropout = nn.Dropout(0.5)
+def train():
+    transform = transforms.Compose(
+        [
+            transforms.Resize((356, 356)),
+            transforms.RandomCrop((299, 299)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+        ]
+    )
 
-    def forward(self, images):
-        features = self.inception(images)
-        return self.dropout(self.relu(features))
+    train_loader, dataset = get_loader(
+        root_folder="flickr8k/images",
+        annotation_file="flickr8k/captions.txt",
+        transform=transform,
+        num_workers=2,
+    )
+
+    torch.backends.cudnn.benchmark = True
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    load_model = False
+    save_model = False
+    train_CNN = False
+
+    # Hyperparameters
+    embed_size = 256
+    hidden_size = 256
+    vocab_size = len(dataset.vocab)
+    num_layers = 1
+    learning_rate = 3e-4
+    num_epochs = 100
+
+    # for tensorboard
+    writer = SummaryWriter("runs/flickr")
+    step = 0
+
+    # initialize model, loss etc
+    model = CNNtoRNN(embed_size, hidden_size, vocab_size, num_layers).to(device)
+    criterion = nn.CrossEntropyLoss(ignore_index=dataset.vocab.stoi["<PAD>"])
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    # Only finetune the CNN
+    for name, param in model.encoderCNN.inception.named_parameters():
+        if "fc.weight" in name or "fc.bias" in name:
+            param.requires_grad = True
+        else:
+            param.requires_grad = train_CNN
+
+    if load_model:
+        step = load_checkpoint(torch.load("my_checkpoint.pth.tar"), model, optimizer)
+
+    model.train()
+
+    for epoch in range(num_epochs):
+        # Uncomment the line below to see a couple of test cases
+        # print_examples(model, device, dataset)
+
+        if save_model:
+            checkpoint = {
+                "state_dict": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "step": step,
+            }
+            save_checkpoint(checkpoint)
+
+        for idx, (imgs, captions) in tqdm(
+            enumerate(train_loader), total=len(train_loader), leave=False
+        ):
+            imgs = imgs.to(device)
+            captions = captions.to(device)
+
+            outputs = model(imgs, captions[:-1])
+            loss = criterion(
+                outputs.reshape(-1, outputs.shape[2]), captions.reshape(-1)
+            )
+
+            writer.add_scalar("Training loss", loss.item(), global_step=step)
+            step += 1
+
+            optimizer.zero_grad()
+            loss.backward(loss)
+            optimizer.step()
 
 
-class DecoderRNN(nn.Module):
-    def __init__(self, embed_size, hidden_size, vocab_size, num_layers):
-        super(DecoderRNN, self).__init__()
-        self.embed = nn.Embedding(vocab_size, embed_size)
-        self.lstm = nn.LSTM(embed_size, hidden_size, num_layers)
-        self.linear = nn.Linear(hidden_size, vocab_size)
-        self.dropout = nn.Dropout(0.5)
-
-    def forward(self, features, captions):
-        embeddings = self.dropout(self.embed(captions))
-        embeddings = torch.cat((features.unsqueeze(0), embeddings), dim=0)
-        hiddens, _ = self.lstm(embeddings)
-        outputs = self.linear(hiddens)
-        return outputs
-
-
-class CNNtoRNN(nn.Module):
-    def __init__(self, embed_size, hidden_size, vocab_size, num_layers):
-        super(CNNtoRNN, self).__init__()
-        self.encoderCNN = EncoderCNN(embed_size)
-        self.decoderRNN = DecoderRNN(embed_size, hidden_size, vocab_size, num_layers)
-
-    def forward(self, images, captions):
-        features = self.encoderCNN(images)
-        outputs = self.decoderRNN(features, captions)
-        return outputs
-
-    def caption_image(self, image, vocabulary, max_length=50):
-        result_caption = []
-
-        with torch.no_grad():
-            x = self.encoderCNN(image).unsqueeze(0)
-            states = None
-
-            for _ in range(max_length):
-                hiddens, states = self.decoderRNN.lstm(x, states)
-                output = self.decoderRNN.linear(hiddens.squeeze(0))
-                predicted = output.argmax(1)
-                result_caption.append(predicted.item())
-                x = self.decoderRNN.embed(predicted).unsqueeze(0)
-
-                if vocabulary.itos[predicted.item()] == "<EOS>":
-                    break
-
-        return [vocabulary.itos[idx] for idx in result_caption]
+if __name__ == "__main__":
+    train()
