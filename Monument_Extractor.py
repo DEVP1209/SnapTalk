@@ -36,8 +36,8 @@ def copy_and_rename_images(src_folder, dest_folder):
                     count += 1
 
 # Define source and destination directories
-source_folder = '/Users/mukeshpatel/Downloads/Indian-monuments/images'
-destination_folder = '/Users/mukeshpatel/Documents/7TH SEMESTER/SnapTalk/Dataset'
+source_folder = '/Users/mukeshpatel/Downloads/indian_temples'
+destination_folder = '/Users/mukeshpatel/Downloads/temples/Images/'
 
 # Create a single folder for all images in the copied dataset
 images_folder = os.path.join(destination_folder, 'images')

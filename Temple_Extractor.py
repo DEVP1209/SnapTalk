@@ -29,7 +29,7 @@ def copy_and_rename_images(src_folder, dest_folder):
 
 # Define source and destination directories
 source_folder = '/Users/mukeshpatel/Downloads/indian_temples'  # Folder containing temple subfolders
-destination_folder = '/Users/mukeshpatel/Documents/7TH SEMESTER/SnapTalk/Dataset/images/'  # Destination folder where images will be copied
+destination_folder = '/Users/mukeshpatel/Downloads/temples/Images/'  # Destination folder where images will be copied
 
 # Create destination folder if it doesn't exist
 if not os.path.exists(destination_folder):
